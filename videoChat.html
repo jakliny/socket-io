@@ -1,0 +1,16 @@
+<div class="row">
+    <div class="col-md-12">
+        <video id="localVideo" class="local-video" autoplay></video>
+        <video id="remoteVideo" class="remote-video" autoplay></video>
+    </div>
+    <div class="col-md-12">
+        <button class="btn btn-default" id="startButton">Start</button>
+        <button class="btn btn-default" id="callButton">Call</button>
+        <button class="btn btn-default" id="hangupButton">Hang Up</button>
+        <button class="btn btn-default" id="recordButton" ng-click="vm.startRecord()"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA
+AAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO
+9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="Red dot" /> Record</button>
+        <button class="btn btn-default" id="stopRecordButton" ng-click="vm.stopRecord()">Stop</button>
+        <button class="btn btn-success" id="viewRecordButton" ng-click="vm.viewRecording()">Play Back</button>
+    </div>
+</div>

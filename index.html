@@ -1,19 +1,21 @@
 <!doctype html>
-<html>
+<html ng-app="app">
 
 <head>
     <title>Socket.IO chat</title>
+
+    <link data-require="bootstrap-css@*" data-semver="3.3.6" rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.css">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
+        
         body {
             font: 13px Helvetica, Arial;
         }
-
+        
         form {
             background: #000;
             padding: 3px;
@@ -21,70 +23,108 @@
             width: 100%;
             bottom: 0;
         }
-
+        
         form input {
             border: 0;
             padding: 10px;
             width: 70%;
             margin-right: .5%;
         }
-
+        
         form button {
             width: 28%;
             background: rgb(130, 224, 255);
             border: none;
             padding: 10px;
         }
-
+        
         #messages {
             list-style-type: none;
             margin: 0;
             padding: 0;
         }
-
+        
         #messages li {
             padding: 5px 10px;
         }
-
+        
         #messages li:nth-child(odd) {
             background: #eee;
         }
-
+        
         #whiteboardCanvas {
             border: 1px solid grey
         }
-
+        
         .container {
             float: left;
             width: 50%;
+        }
+        
+        .remote-video {
+            /*position: absolute;*/
+            top: 0;
+            left: 0;
+            z-index: 99;
+            display: block;
+            width: 620px;
+            border: .5px solid #ccc;
+        }
+        
+        .local-video {
+            /*position: absolute;*/
+            display: block;
+            z-index: 100;
+            top: 340px;
+            left: 455px;
+            width: 25%;
         }
     </style>
 </head>
 
 <body>
-<div class="container">
-    <ul id="messages"></ul>
-    <form action="">
-        <input id="m" autocomplete="off" />
-        <button>Send</button>
-    </form>
-</div>
-<div class="conatiner">
-    <canvas id="whiteboardCanvas" width="400" height="400"></canvas>
-    <button onclick="setColor(200,0,0)" style="color: #FFF; background-color: rgb(200,0,0)">Red</button>
+    <div class="row">
+        <div class="col-md-6">
+            <video-chat></video-chat>
+        </div>
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-12">
+                    <canvas id="whiteboardCanvas" width="400" height="400"></canvas>
+                </div>
+                <div class="col-md-12">
+                    <button onclick="setColor(200,0,0)" style="color: #FFF; background-color: rgb(200,0,0)">Red</button>
 
-    <button onclick="setColor(0,128,0)" style="color: #FFF; background-color: rgb(0,128,0)">Green</button>
+                    <button onclick="setColor(0,128,0)" style="color: #FFF; background-color: rgb(0,128,0)">Green</button>
 
-    <button onclick="setColor(0,0,255)" style="color: #FFF; background-color: rgb(0,0,255)">Blue</button>
+                    <button onclick="setColor(0,0,255)" style="color: #FFF; background-color: rgb(0,0,255)">Blue</button>
 
-    <button onclick="setColor(0,0,0)" style="color: #FFF; background-color: rgb(0,0,0)">Black</button>
+                    <button onclick="setColor(0,0,0)" style="color: #FFF; background-color: rgb(0,0,0)">Black</button>
 
-    <button onclick="erase()">Erase Whiteboard</button>
-</div>
-<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
-<script data-require="jquery@*" data-semver="2.2.0" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
-<script>
-    // chat app
+                    <button onclick="erase()">Erase Whiteboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <ul id="messages"></ul>
+        <form action="">
+            <input id="m" autocomplete="off" />
+            <button>Send</button>
+        </form>
+    </div>
+
+    <script data-require="jquery@*" data-semver="2.2.0" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+    <script data-require="AngularJS1.4@*" data-semver="1.4.0" src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.1/angular.min.js"></script>
+
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+
+    <script src="app.module.js"></script>
+    <script src="videoChat.module.js"></script>
+    <script src="videoChat.directive.js"></script>
+
+    <script>
+        // chat app
     var socket = io();
     $('form').submit(function(){
         socket.emit('chat message', $('#m').val());
@@ -279,7 +319,171 @@
     // io().on('close-draw', function(command) {
     //   client.handleWebsocketClose(command);
     // });
-</script>
+    </script>
+
+
+    <script>
+        var RTCPeerConnection = null;
+    var getUserMedia = null;
+    var attachMediaStream = null;
+    var reattachMediaStream = null;
+    var webrtcDetectedBrowser = null;
+    var webrtcDetectedVersion = null;
+
+    function trace(text) {
+        // This function is used for logging.
+        if (text[text.length - 1] == '\n') {
+            text = text.substring(0, text.length - 1);
+        }
+        console.log((performance.now() / 1000).toFixed(3) + ": " + text);
+    }
+
+    if (navigator.mozGetUserMedia) {
+        console.log("This appears to be Firefox");
+
+        webrtcDetectedBrowser = "firefox";
+
+        webrtcDetectedVersion =
+            parseInt(navigator.userAgent.match(/Firefox\/([0-9]+)\./)[1]);
+
+        // The RTCPeerConnection object.
+        RTCPeerConnection = mozRTCPeerConnection;
+
+        // The RTCSessionDescription object.
+        RTCSessionDescription = mozRTCSessionDescription;
+
+        // The RTCIceCandidate object.
+        RTCIceCandidate = mozRTCIceCandidate;
+
+        // Get UserMedia (only difference is the prefix).
+        // Code from Adam Barth.
+        getUserMedia = navigator.mozGetUserMedia.bind(navigator);
+
+        // Creates iceServer from the url for FF.
+        createIceServer = function(url, username, password) {
+            var iceServer = null;
+            var url_parts = url.split(':');
+            if (url_parts[0].indexOf('stun') === 0) {
+                // Create iceServer with stun url.
+                iceServer = { 'url': url };
+            } else if (url_parts[0].indexOf('turn') === 0 &&
+                (url.indexOf('transport=udp') !== -1 ||
+                url.indexOf('?transport') === -1)) {
+                // Create iceServer with turn url.
+                // Ignore the transport parameter from TURN url.
+                var turn_url_parts = url.split("?");
+                iceServer = { 'url': turn_url_parts[0],
+                    'credential': password,
+                    'username': username };
+            }
+            return iceServer;
+        };
+
+        // Attach a media stream to an element.
+        attachMediaStream = function(element, stream) {
+            console.log("Attaching media stream");
+            element.mozSrcObject = stream;
+            element.play();
+        };
+
+        reattachMediaStream = function(to, from) {
+            console.log("Reattaching media stream");
+            to.mozSrcObject = from.mozSrcObject;
+            to.play();
+        };
+
+        // Fake get{Video,Audio}Tracks
+        MediaStream.prototype.getVideoTracks = function() {
+            return [];
+        };
+
+        MediaStream.prototype.getAudioTracks = function() {
+            return [];
+        };
+    } else if (navigator.webkitGetUserMedia) {
+        console.log("This appears to be Chrome");
+
+        webrtcDetectedBrowser = "chrome";
+        webrtcDetectedVersion =
+            parseInt(navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./)[2]);
+
+        // Creates iceServer from the url for Chrome.
+        createIceServer = function(url, username, password) {
+            var iceServer = null;
+            var url_parts = url.split(':');
+            if (url_parts[0].indexOf('stun') === 0) {
+                // Create iceServer with stun url.
+                iceServer = { 'url': url };
+            } else if (url_parts[0].indexOf('turn') === 0) {
+                if (webrtcDetectedVersion < 28) {
+                    // For pre-M28 chrome versions use old TURN format.
+                    var url_turn_parts = url.split("turn:");
+                    iceServer = { 'url': 'turn:' + username + '@' + url_turn_parts[1],
+                        'credential': password };
+                } else {
+                    // For Chrome M28 & above use new TURN format.
+                    iceServer = { 'url': url,
+                        'credential': password,
+                        'username': username };
+                }
+            }
+            return iceServer;
+        };
+
+        // The RTCPeerConnection object.
+        RTCPeerConnection = webkitRTCPeerConnection;
+
+        // Get UserMedia (only difference is the prefix).
+        // Code from Adam Barth.
+        getUserMedia = navigator.webkitGetUserMedia.bind(navigator);
+
+        // Attach a media stream to an element.
+        attachMediaStream = function(element, stream) {
+            if (typeof element.srcObject !== 'undefined') {
+                element.srcObject = stream;
+            } else if (typeof element.mozSrcObject !== 'undefined') {
+                element.mozSrcObject = stream;
+            } else if (typeof element.src !== 'undefined') {
+                element.src = URL.createObjectURL(stream);
+            } else {
+                console.log('Error attaching stream to element.');
+            }
+        };
+
+        reattachMediaStream = function(to, from) {
+            to.src = from.src;
+        };
+
+        // The representation of tracks in a stream is changed in M26.
+        // Unify them for earlier Chrome versions in the coexisting period.
+        if (!webkitMediaStream.prototype.getVideoTracks) {
+            webkitMediaStream.prototype.getVideoTracks = function() {
+                return this.videoTracks;
+            };
+            webkitMediaStream.prototype.getAudioTracks = function() {
+                return this.audioTracks;
+            };
+        }
+
+        // New syntax of getXXXStreams method in M26.
+        if (!webkitRTCPeerConnection.prototype.getLocalStreams) {
+            webkitRTCPeerConnection.prototype.getLocalStreams = function() {
+                return this.localStreams;
+            };
+            webkitRTCPeerConnection.prototype.getRemoteStreams = function() {
+                return this.remoteStreams;
+            };
+        }
+    } else {
+        console.log("Browser does not appear to be WebRTC-capable");
+    }
+    </script>
+
+    <script src="https://cdn.WebRTC-Experiment.com/RecordRTC.js"></script>
+    <script src="https://cdn.webrtc-experiment.com/screenshot.js"></script>
+
+
+
 </body>
 
 </html>
