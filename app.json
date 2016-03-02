@@ -1,0 +1,14 @@
+{
+  "name": "chat-example",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "env": {
+  },
+  "addons": [
+
+  ],
+  "buildpacks": [
+
+  ]
+}

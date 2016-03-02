@@ -1,0 +1,296 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Socket.IO chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font: 13px Helvetica, Arial;
+    }
+    
+    form {
+      background: #000;
+      padding: 3px;
+      position: absolute;
+      width: 100%;
+      bottom: 0;
+    }
+    
+    form input {
+      border: 0;
+      padding: 10px;
+      width: 70%;
+      margin-right: .5%;
+    }
+    
+    form button {
+      width: 28%;
+      background: rgb(130, 224, 255);
+      border: none;
+      padding: 10px;
+    }
+    
+    #messages {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+    }
+    
+    #messages li {
+      padding: 5px 10px;
+    }
+    
+    #messages li:nth-child(odd) {
+      background: #eee;
+    }
+    
+    #whiteboardCanvas {
+      border: 1px solid grey
+    }
+    
+    .container {
+      float: left;
+      width: 50%;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <ul id="messages"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" />
+      <button>Send</button>
+    </form>
+  </div>
+  <div class="conatiner">
+    <canvas id="whiteboardCanvas" width="400" height="400"></canvas>
+    <button onclick="setColor(200,0,0)" style="color: #FFF; background-color: rgb(200,0,0)">Red</button>
+
+    <button onclick="setColor(0,128,0)" style="color: #FFF; background-color: rgb(0,128,0)">Green</button>
+
+    <button onclick="setColor(0,0,255)" style="color: #FFF; background-color: rgb(0,0,255)">Blue</button>
+
+    <button onclick="setColor(0,0,0)" style="color: #FFF; background-color: rgb(0,0,0)">Black</button>
+
+    <button onclick="erase()">Erase Whiteboard</button>
+  </div>
+  <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+  <script data-require="jquery@*" data-semver="2.2.0" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+  <script>
+    // chat app
+    var socket = io();
+      $('form').submit(function(){
+        socket.emit('chat message', $('#m').val());
+        $('#m').val('');
+        return false;
+      });
+      socket.on('chat message', function(msg){
+        $('#messages').append($('<li>').text(msg));
+      });
+    
+    // whiteboard app
+Whiteboard.prototype.connect = function() {
+    var socket = io();
+    // var url = "ws://" + document.URL.substr(7).split('/')[0];
+    
+    // var wsCtor = window['MozWebSocket'] ? MozWebSocket : WebSocket;
+    // this.socket = new wsCtor(url, 'whiteboard-example');
+    socket.emit('whiteboard');
+
+    // this.socket.onmessage = this.handleWebsocketMessage.bind(this);
+    // this.socket.onclose = this.handleWebsocketClose.bind(this);
+
+    this.addCanvasEventListeners();
+};
+
+Whiteboard.prototype.handleWebsocketMessage = function(message) {
+    // try {
+    //     var command = JSON.parse(message.data);
+    // }
+    // catch(e) { /* do nothing */ }
+    
+    // if (command) {
+        this.dispatchCommand(message);
+    // }
+};
+
+Whiteboard.prototype.handleWebsocketClose = function() {
+    alert("WebSocket Connection Closed.");
+};
+
+Whiteboard.prototype.dispatchCommand = function(command) {
+    // Do we have a handler function for this command?
+    var handler = this.messageHandlers[command.msg];
+    if (typeof(handler) === 'function') {
+        // If so, call it and pass the parameter data
+        handler.call(this, command.data);
+    }
+};
+
+Whiteboard.prototype.initCommands = function(commandList) {
+    /* Upon connection, the contents of the whiteboard
+       are drawn by replaying all commands since the
+       last time it was cleared */
+    commandList.forEach(function(command) {
+        this.dispatchCommand(command);
+    }.bind(this));
+};
+
+Whiteboard.prototype.sendClear = function() {
+    io().emit('message', { msg: 'clear' });
+};
+
+Whiteboard.prototype.setColor = function(r,g,b) {
+    this.color = {
+        r: r,
+        g: g,
+        b: b
+    };
+};
+
+Whiteboard.prototype.drawLine = function(data) {
+    // Set the color
+    var color = data.color;
+    this.ctx.strokeStyle = 'rgb(' + color.r + "," + color.g + "," + color.b +')';
+
+    this.ctx.beginPath();
+    
+    var points = data.points;
+    // Starting point
+    this.ctx.moveTo(points[0]+0.5, points[1]+0.5);
+    
+    // Ending point
+    this.ctx.lineTo(points[2]+0.5, points[3]+0.5);
+    
+    this.ctx.stroke();
+};
+
+Whiteboard.prototype.clear = function() {
+    this.canvas.width = this.canvas.width;
+};
+
+Whiteboard.prototype.handleMouseDown = function(event) {
+    this.mouseDown = true;
+	this.lastPoint = this.resolveMousePosition(event);
+};
+
+Whiteboard.prototype.handleMouseUp = function(event) {
+    this.mouseDown = false;
+    this.lastPoint = null;
+};
+
+Whiteboard.prototype.handleMouseMove = function(event) {
+    if (!this.mouseDown) { return; }
+
+    var currentPoint = this.resolveMousePosition(event);
+
+    // Send a draw command to the server.
+    // The actual line is drawn when the command
+    // is received back from the server.
+    io().emit('message', {
+        msg: 'drawLine',
+        data: {
+            color: this.color,
+            points: [
+                this.lastPoint.x,
+                this.lastPoint.y,
+                currentPoint.x,
+                currentPoint.y
+            ]
+        }
+    });
+    
+    this.lastPoint = currentPoint;
+};
+
+Whiteboard.prototype.initCanvas = function(canvasId) {
+    this.canvasId = canvasId;
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.initCanvasOffset();
+};
+
+Whiteboard.prototype.initCanvasOffset = function() {
+    this.offsetX = this.offsetY = 0;
+    var element = this.canvas;
+    if (element.offsetParent) {
+        do {
+            this.offsetX += element.offsetLeft;
+            this.offsetY += element.offsetTop;
+        }
+        while ((element = element.offsetParent));
+    }
+};
+
+Whiteboard.prototype.addCanvasEventListeners = function() {
+    this.canvas.addEventListener(
+        'mousedown', this.handleMouseDown.bind(this), false);
+    
+    window.document.addEventListener(
+        'mouseup', this.handleMouseUp.bind(this), false);
+        
+    this.canvas.addEventListener(
+        'mousemove', this.handleMouseMove.bind(this), false);
+};
+
+Whiteboard.prototype.resolveMousePosition = function(event) {
+    var x, y;
+	if (event.offsetX) {
+		x = event.offsetX;
+		y = event.offsetY;
+	} else {
+		x = event.layerX - this.offsetX;
+		y = event.layerY - this.offsetY;
+	}
+	return { x: x, y: y };
+};
+
+    var client = new Whiteboard('whiteboardCanvas');
+    client.connect();
+    
+    function erase() {
+      client.sendClear();
+    }
+    
+    function setColor(r,g,b) {
+      client.setColor(r,g,b);
+    }
+    
+    function Whiteboard(canvasId) {
+      this.initCanvas(canvasId);
+    
+      // Define accepted commands
+      this.messageHandlers = {
+        initCommands: this.initCommands.bind(this),
+        drawLine: this.drawLine.bind(this),
+        clear: this.clear.bind(this)
+      };
+
+      // Initial state
+      this.lastPoint = null;
+      this.mouseDown = false;
+      this.color = {
+        r: 0,
+        g: 0,
+        b: 0
+      };
+    };
+
+io().on('draw', function (command) {
+  client.handleWebsocketMessage(command);
+});
+
+// io().on('close-draw', function(command) {
+//   client.handleWebsocketClose(command);
+// });
+  </script>
+</body>
+
+</html>
